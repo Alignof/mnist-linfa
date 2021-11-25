@@ -15,7 +15,6 @@ fn export_data(ds: DatasetBase<ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>, Array
             .unwrap();
     }
 
-    // and plot with gnuplot
     Command::new("gnuplot")
         .arg("-p")
         .arg("data/mnist_plot.plt")
@@ -25,16 +24,16 @@ fn export_data(ds: DatasetBase<ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>, Array
         );
 } 
 
+// https://github.com/rust-ml/linfa/blob/master/algorithms/linfa-tsne/examples/mnist.rs
 fn main() -> Result<()> {
     // use 50k samples from the MNIST dataset
-    let trn_size: usize = 500;
+    let trn_size: usize = 5000;
     let tst_size: usize = 100;
     let (rows, cols) = (28, 28);
 
     println!("start!");
 
     println!("downloading dataset...");
-    // download and extract it into a dataset
     let Mnist {
         trn_img, trn_lbl, tst_img, tst_lbl, ..
     } = MnistBuilder::new()
@@ -45,7 +44,6 @@ fn main() -> Result<()> {
         .finalize();
 
     println!("preparing dataset");
-    // create a dataset from it
     let ds = linfa::Dataset::new(
         ndarray::Array::from_shape_vec((trn_size, rows * cols), trn_img)?.mapv(|x| (x as f64) / 255.),
         ndarray::Array::from_shape_vec((trn_size, 1), trn_lbl)?,
