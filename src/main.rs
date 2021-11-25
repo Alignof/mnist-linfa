@@ -1,74 +1,60 @@
-use linfa::DatasetBase;
-use linfa::traits::{Fit, Transformer};
-use linfa_tsne::Result;
+use linfa::composing::MultiClassModel;
+use linfa::prelude::*;
+use linfa_svm::{error::Result, Svm};
 use mnist::{Mnist, MnistBuilder};
-use ndarray::{ArrayBase, OwnedRepr, Dim};
-use std::{io::Write, process::Command};
 
-fn export_data(ds: DatasetBase<ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>, ArrayBase<OwnedRepr<u8>, Dim<[usize; 2]>>>) {
-    let mut f = std::fs::File::create("data/mnist.dat").unwrap();
-
-    println!("write to file");
-
-    for (x, y) in ds.sample_iter() {
-        f.write_all(format!("{} {} {}\n", x[0], x[1], y[0]).as_bytes())
-            .unwrap();
-    }
-
-    Command::new("gnuplot")
-        .arg("-p")
-        .arg("data/mnist_plot.plt")
-        .spawn()
-        .expect(
-            "Failed to launch gnuplot. Pleasure ensure that gnuplot is installed and on the $PATH.",
-        );
-} 
-
-// https://github.com/rust-ml/linfa/blob/master/algorithms/linfa-tsne/examples/mnist.rs
 fn main() -> Result<()> {
     // use 50k samples from the MNIST dataset
-    let trn_size: usize = 5000;
-    let tst_size: usize = 100;
+    let data_size: usize = 5000;
     let (rows, cols) = (28, 28);
 
     println!("start!");
 
     println!("downloading dataset...");
     let Mnist {
-        trn_img, trn_lbl, tst_img, tst_lbl, ..
+        trn_img, trn_lbl, ..
     } = MnistBuilder::new()
         .label_format_digit()
-        .training_set_length(trn_size as u32)
-        .test_set_length(tst_size as u32)
+        .training_set_length(data_size as u32)
         .download_and_extract()
         .finalize();
 
     println!("preparing dataset");
     let ds = linfa::Dataset::new(
-        ndarray::Array::from_shape_vec((trn_size, rows * cols), trn_img)?.mapv(|x| (x as f64) / 255.),
-        ndarray::Array::from_shape_vec((trn_size, 1), trn_lbl)?,
+        ndarray::Array::from_shape_vec((data_size, rows * cols), trn_img)
+            .unwrap()
+            .mapv(|x| (x as f64) / 255.),
+        ndarray::Array::from_shape_vec((data_size, 1), trn_lbl).unwrap(),
     );
 
+    let (train, valid) = ds.map_targets(|x| *x as usize).split_with_ratio(0.9);
 
-    println!("whitening");
-    // reduce to 50 dimension without whitening
-    let ds = linfa_reduction::Pca::params(50)
-        .whiten(false)
-        .fit(&ds)
-        .unwrap()
-        .transform(ds);
+    println!(
+        "Fit SVM classifier with #{} training points",
+        train.nsamples()
+    );
 
+    let params = Svm::<_, Pr>::params()
+        //.pos_neg_weights(5000., 500.)
+        .gaussian_kernel(30.0);
 
-    println!("calculating");
-    // calculate a two-dimensional embedding with Barnes-Hut t-SNE
-    let ds = linfa_tsne::TSneParams::embedding_size(2)
-        .perplexity(50.0)
-        .approx_threshold(0.5)
-        .max_iter(1000)
-        .transform(ds)?;
+    let model = train
+        .one_vs_all()?
+        .into_iter()
+        .map(|(l, x)| (l, params.fit(&x).unwrap()))
+        .collect::<MultiClassModel<_, _>>();
 
-    // export data to dat
-    export_data(ds);
+    let pred = model.predict(&valid);
+
+    // create a confusion matrix
+    let cm = pred.confusion_matrix(&valid)?;
+
+    // Print the confusion matrix
+    println!("{:?}", cm);
+
+    // Calculate the accuracy and Matthew Correlation Coefficient (cross-correlation between
+    // predicted and targets)
+    println!("accuracy {}, MCC {}", cm.accuracy(), cm.mcc());
 
     Ok(())
 }
