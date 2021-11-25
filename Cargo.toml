@@ -12,5 +12,5 @@ ndarray-rand = "0.14"
 bhtsne = "0.4.0"
 linfa = { version = "0.5.0", features = ["intel-mkl-system"] } 
 linfa-reduction = "0.5.0"
-linfa-tsne = "0.5.0"
+linfa-svm = "0.5.0"
 mnist = { version = "0.5.0", features = ["download"] }
