@@ -28,6 +28,7 @@ fn export_data(ds: DatasetBase<ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>, Array
 fn main() -> Result<()> {
     // use 50k samples from the MNIST dataset
     let trn_size: usize = 500;
+    let tst_size: usize = 100;
     let (rows, cols) = (28, 28);
 
     println!("start!");
@@ -39,9 +40,9 @@ fn main() -> Result<()> {
     } = MnistBuilder::new()
         .label_format_digit()
         .training_set_length(trn_size as u32)
+        .test_set_length(tst_size as u32)
         .download_and_extract()
         .finalize();
-
 
     println!("preparing dataset");
     // create a dataset from it
@@ -69,7 +70,7 @@ fn main() -> Result<()> {
         .transform(ds)?;
 
     // export data to dat
-    //export_data(ds);
+    export_data(ds);
 
     Ok(())
 }
